@@ -34,7 +34,7 @@ python3 -m venv .venv
 .venv/bin/talkcut --help
 ```
 
-平台状态和实测结果见 VALIDATION.md。macOS/Linux 命令为安装说明，不代表已在对应系统验收。
+平台状态和实测结果见 [VALIDATION.md](VALIDATION.md)。Windows 和 Linux 合成流程已验证；macOS 安装命令尚未经实际验收。
 
 ## 先跑合成素材
 
