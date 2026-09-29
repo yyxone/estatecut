@@ -121,9 +121,9 @@ def build_music_audio_chain(
     丢弃前 N 秒后仍是有效无限流；输入 -ss 与 -stream_loop 的交互跨 ffmpeg 版本不稳定，
     且曲子短于 N 秒时输入 seek 行为未定义。asetpts 把时间戳归零，让下游 afade/amix/-t 正常。
 
-    传了 track_dur 且曲长 < 片长（循环点会被听到）时，改为 crossfade 拼贴消接缝
-    （music_loop_plan）：先 atrim 取整曲一遍（无限流变有限）→ asplit N 份 → 链式
-    acrossfade 交叉淡化拼接，再进原有起点/音量/淡入淡出步骤。命令侧不变。
+    传了 track_dur 且曲长 < 片长时，用等长淡入淡出、延迟和不归一的 amix
+    做线性交叉淡化。避免 FFmpeg 6.1 的串联 acrossfade 在共享 EOF 时丢失音轨。
+    再进入原有起点/音量/整体淡入淡出步骤。命令侧不变。
     """
     fade = min(float(music_cfg.get("fade_out") or 0), target_dur / 2)
     fade_in = min(float(music_cfg.get("fade_in") or 0), target_dur / 2)
@@ -138,11 +138,18 @@ def build_music_audio_chain(
         splits = "".join(f"[lp{i}]" for i in range(copies))
         loop_prefix = (f"{music_label}atrim=duration={float(track_dur):.3f},"
                        f"asetpts=PTS-STARTPTS,asplit={copies}{splits};")
-        cur = "[lp0]"
-        for i in range(1, copies):
-            nxt = "[loop]" if i == copies - 1 else f"[lx{i}]"
-            loop_prefix += f"{cur}[lp{i}]acrossfade=d={xfade:.3f}{nxt};"
-            cur = nxt
+        for i in range(copies):
+            filters = []
+            if i > 0:
+                filters.append(f"afade=t=in:st=0:d={xfade:.3f}")
+            if i < copies - 1:
+                filters.append(f"afade=t=out:st={float(track_dur) - xfade:.3f}:d={xfade:.3f}")
+            if i > 0:
+                delay_ms = round(i * (float(track_dur) - xfade) * 1000)
+                filters.append(f"adelay={delay_ms}:all=1")
+            loop_prefix += f"[lp{i}]{','.join(filters)}[lx{i}];"
+        loop_prefix += ("".join(f"[lx{i}]" for i in range(copies))
+                        + f"amix=inputs={copies}:duration=longest:dropout_transition=0:normalize=0[loop];")
         music_label = "[loop]"
 
     mchain = music_label

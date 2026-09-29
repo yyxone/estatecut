@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from estatecut.ffmpeg_tools import ffmpeg_available
+from estatecut.ffmpeg_tools import ffmpeg_available, probe_media
 
 from propcut.export import (build_music_audio_chain, export_video, music_loop_plan)
 
@@ -63,10 +63,11 @@ def test_loop_plan_total_length_always_sufficient() -> None:
 def test_chain_engages_crossfade_only_when_looping() -> None:
     cfg = _music_cfg(music_start=0.5, fade_in=0.5)
     looped = build_music_audio_chain(cfg, 10.0, track_dur=3.0)
-    assert "asplit=" in looped and "acrossfade=d=0.750" in looped
+    assert "asplit=" in looped and "afade=t=in:st=0:d=0.750" in looped
     assert "[loop]atrim=start=0.500" in looped            # 循环流之后才走原有起点/音量步骤
     copies, _ = music_loop_plan(3.0, 0.5, 10.0)
-    assert looped.count("acrossfade") == copies - 1
+    assert f"amix=inputs={copies}:duration=longest:dropout_transition=0:normalize=0" in looped
+    assert looped.count("adelay=") == copies - 1
     # 曲够长 / 不传曲长 → 与现状逐字符一致（零行为变化）
     plain = build_music_audio_chain(cfg, 10.0)
     assert build_music_audio_chain(cfg, 10.0, track_dur=60.0) == plain
@@ -76,7 +77,7 @@ def test_chain_engages_crossfade_only_when_looping() -> None:
 def test_chain_mix_mode_keeps_amix_shape() -> None:
     chain = build_music_audio_chain(_music_cfg(original_audio="mix"), 10.0,
                                     mix_original=True, track_dur=3.0)
-    assert chain.count("acrossfade") >= 1
+    assert "asplit=" in chain and "adelay=" in chain
     assert "amix=inputs=2" in chain and chain.endswith("[outa]")
 
 
@@ -99,11 +100,12 @@ def _tail_mean_volume(path: Path, tail_start: float) -> float:
     return float(m.group(1))
 
 
-def test_export_short_track_loops_seamlessly(tmp_path: Path) -> None:
+@pytest.mark.parametrize("target_duration", [8.0, 10.0, 16.0])
+def test_export_short_track_loops_seamlessly(tmp_path: Path, target_duration: float) -> None:
     if not ffmpeg_available():
         pytest.skip("FFmpeg/ffprobe is not available")
     src = tmp_path / "in.mp4"
-    _ffmpeg(["-f", "lavfi", "-i", "smptebars=size=320x180:rate=24", "-t", "10",
+    _ffmpeg(["-f", "lavfi", "-i", "smptebars=size=320x180:rate=24", "-t", str(target_duration),
              "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", "ultrafast", str(src)])
     short = tmp_path / "short.wav"   # 3s 曲配 10s 片：老路径 wrap 两次硬接
     _ffmpeg(["-f", "lavfi", "-i", "sine=frequency=440:duration=3",
@@ -112,11 +114,12 @@ def test_export_short_track_loops_seamlessly(tmp_path: Path) -> None:
     out = tmp_path / "out.mp4"
     music_cfg = _music_cfg(music_start=0.5, fade_out=1.0,
                            loudnorm={"enabled": True, "i": -14.0, "tp": -1.5, "lra": 11.0})
-    result = export_video(src, out, 0.0, 10.0, "",
+    result = export_video(src, out, 0.0, target_duration, "",
                           {"resolution": "original", "fit": "pad", "quality": "low"},
                           short, music_cfg, False)
     assert out.exists()
     # 尾段（fade_out 之前）必须有声：拼贴份数不足会在这里露馅
-    assert _tail_mean_volume(out, 7.5) > -50.0
+    assert _tail_mean_volume(out, target_duration - 2.5) > -50.0
+    assert probe_media(out)["audio_present"]
     # 与 loudnorm 组合：测量遍与导出遍同链（都含拼贴），归一仍到位
     assert result["loudnorm"]["applied"] is True
