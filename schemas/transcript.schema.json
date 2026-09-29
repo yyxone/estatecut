@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "estatecut/transcript.schema.json",
+  "title": "Transcript (project-neutral, ASR-engine-agnostic)",
+  "description": "口播视频的理解层产物。外部 ASR（faster-whisper 等）输出经 asr_adapter 转成本 schema。承载语音转录 + Gemini 看画面的视觉理解，供 paper-edit 决定剪点。",
+  "type": "object",
+  "required": ["project", "source", "segments", "asr", "gap_audit"],
+  "properties": {
+    "project": { "type": "string", "description": "项目 slug，如 地下室如何看房" },
+    "source": {
+      "type": "object",
+      "required": ["path", "duration_sec"],
+      "properties": {
+        "path": { "type": "string", "description": "拼接后连续时间线 source.mp4 的路径" },
+        "duration_sec": { "type": "number" },
+        "clips": { "type": "array", "items": { "type": "object",
+          "required": ["clip_id", "filename", "offset_sec", "duration_sec"],
+          "properties": {
+            "clip_id": { "type": "string" },
+            "filename": { "type": "string" },
+            "offset_sec": { "type": "number", "description": "该段在连续时间线的起始偏移" },
+            "duration_sec": { "type": "number" }
+          } } }
+      }
+    },
+    "asr": {
+      "type": "object",
+      "description": "ASR 调用参数留痕（可复现）",
+      "required": ["engine", "model", "device"],
+      "properties": {
+        "engine": { "type": "string", "examples": ["faster-whisper"] },
+        "model": { "type": "string", "examples": ["large-v3"] },
+        "device": { "type": "string", "enum": ["cuda", "cpu"] },
+        "params": { "type": "object", "description": "vad_filter / condition_on_previous_text / temperature / initial_prompt 等" },
+        "mode": { "type": "string", "enum": ["mock", "real"], "description": "本份转录是 mock 还是真实 ASR（R2 G2 溯源；非 required，兼容旧 transcript）" },
+        "invoked_at": { "type": "string", "description": "ASR 调用时刻 ISO 8601 UTC（R2 G2 溯源；非 required，兼容旧 transcript）" }
+      }
+    },
+    "segments": {
+      "type": "array",
+      "description": "段级转录。无语音段允许 text 空但带 vision 描述。",
+      "items": {
+        "type": "object",
+        "required": ["start", "end"],
+        "properties": {
+          "start": { "type": "number" },
+          "end": { "type": "number" },
+          "text": { "type": "string", "description": "语音转录原文（纠错前）" },
+          "text_corrected": { "type": "string", "description": "应用 corrections.json 后" },
+          "words": { "type": "array", "items": { "type": "object",
+            "required": ["start", "end", "word"],
+            "properties": { "start": {"type":"number"}, "end": {"type":"number"}, "word": {"type":"string"} } } },
+          "vision": { "type": "string", "description": "Gemini video 模式对该段画面的理解（尤其无语音段）" },
+          "source_clip_id": { "type": "string" }
+        }
+      }
+    },
+    "gap_audit": {
+      "type": "array",
+      "description": "对低/无转录区间的音量审计——硬规则：字幕空白≠没内容",
+      "items": {
+        "type": "object",
+        "required": ["start", "end", "mean_volume_db", "decision", "result"],
+        "properties": {
+          "start": { "type": "number" },
+          "end": { "type": "number" },
+          "mean_volume_db": { "type": "number" },
+          "decision": { "type": "string", "enum": ["retranscribe", "gemini_vision", "true_silence_keep", "true_silence_trim"], "description": "≈说话电平→retranscribe；真静音→gemini_vision 或按内容 trim" },
+          "result": { "type": "string", "description": "强制：重转救回的文本 / Gemini 看画面的视觉结论 / 真静音的证据。逼'字幕空白≠没内容'落到证据，不能空判。" }
+        }
+      }
+    },
+    "corrections_version": { "type": "string", "description": "所用 configs/corrections.json 的版本/日期" }
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "estatecut/state.schema.json",
+  "title": "Project state — 阶段进度 + 3 个人审锁",
+  "description": "每条片子 out/<proj>/state.json。跨 session 恢复用。硬规则：每阶段可重跑/可跳过/可校验；3 个人审锁未上不进下一阶段。",
+  "type": "object",
+  "required": ["project", "stages", "locks"],
+  "properties": {
+    "project": { "type": "string" },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "stages": {
+      "type": "object",
+      "description": "7 阶段状态（全部必须出现，未跑的标 status=pending）",
+      "required": ["ingest", "transcribe", "paper_edit", "rough_cut", "fine_cut", "subtitle", "qa_export"],
+      "properties": {
+        "ingest":      { "$ref": "#/$defs/stage" },
+        "transcribe":  { "$ref": "#/$defs/stage" },
+        "paper_edit":  { "$ref": "#/$defs/stage" },
+        "rough_cut":   { "$ref": "#/$defs/stage" },
+        "fine_cut":    { "$ref": "#/$defs/stage" },
+        "subtitle":    { "$ref": "#/$defs/stage" },
+        "qa_export":   { "$ref": "#/$defs/stage" }
+      }
+    },
+    "locks": {
+      "type": "object",
+      "description": "3 个人审锁——人拍板的关卡",
+      "required": ["transcript_lock", "cut_lock", "subtitle_lock"],
+      "properties": {
+        "transcript_lock": { "$ref": "#/$defs/lock", "description": "转录稿人审通过 → 才进 paper-edit（记录绑 transcript.json）" },
+        "cut_lock":        { "$ref": "#/$defs/lock", "description": "剪点(EDL)人审通过 → 才进 rough-cut/fine-cut（记录绑 edl.json 决策面）" },
+        "subtitle_lock":   { "$ref": "#/$defs/lock", "description": "字幕人审通过 → 才进最终 qa-export 字幕烧录(如启用)（记录绑 字幕.srt）" }
+      }
+    }
+  },
+  "$defs": {
+    "lock": {
+      "description": "false=未上锁；审批记录=已上锁且绑定产物内容 hash；旧版布尔 true 读取时 fail-closed（require_lock 拒绝，须重新人审上锁）",
+      "oneOf": [
+        { "type": "boolean" },
+        { "$ref": "#/$defs/lock_record" }
+      ]
+    },
+    "lock_record": {
+      "type": "object",
+      "required": ["artifact", "sha256", "approved_at"],
+      "properties": {
+        "artifact": { "type": "string", "description": "被审批产物（相对 out/<proj>/）" },
+        "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "产物内容指纹（cut_lock 为 EDL 决策面 hash）" },
+        "approved_at": { "type": "string", "description": "UTC ISO 时间" },
+        "approved_by": { "type": "string", "description": "默认 human" }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "required": ["status", "verified"],
+      "properties": {
+        "status": { "type": "string", "enum": ["pending", "done", "skipped", "failed"] },
+        "outputs": { "type": "array", "items": { "type": "string" }, "description": "该阶段产物路径（done 时应非空）" },
+        "outputs_identity": {
+          "type": "object",
+          "description": "done 时记录的产物内容指纹 {basename: {size, quick_hash, algo}}——qa-export 据此拒绝阶段完成后被同名替换的文件；缺失 = legacy state，导出 fail-closed",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["size", "quick_hash", "algo"],
+            "properties": {
+              "size": { "type": "integer" },
+              "quick_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "algo": { "type": "string" }
+            }
+          }
+        },
+        "verified": { "type": "boolean", "description": "是否跑过校验（解码扫描/重转/json.load 等）——强制字段，逼每阶段可校验" },
+        "note": { "type": "string" }
+      }
+    }
+  }
+}

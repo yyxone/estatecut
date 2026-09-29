@@ -1,0 +1,68 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "estatecut/edl.schema.json",
+  "title": "EDL (Edit Decision List) — 剪点决策 + 理由",
+  "description": "paper-edit 阶段产物。记录保留区间 + 每个剪点的理由（剪了什么/留了什么/为什么），rough-cut 据此帧精确渲染。硬规则：人拍板、AI 提议；记录必须同时含 cut_reason 和保留段。",
+  "type": "object",
+  "required": ["project", "source_timeline", "keep_ranges", "cuts", "splices", "broll_cover", "human_locked"],
+  "properties": {
+    "project": { "type": "string" },
+    "source_timeline": { "type": "string", "description": "source.mp4 路径（连续时间线）" },
+    "human_locked": { "type": "boolean", "description": "剪点锁：true 才允许进 rough-cut" },
+    "keep_ranges": {
+      "type": "array",
+      "description": "按输出顺序的保留区间（源时间秒）。每项必须有 label 说明留了什么。",
+      "items": {
+        "type": "object",
+        "required": ["src_start", "src_end", "label"],
+        "properties": {
+          "src_start": { "type": "number" },
+          "src_end": { "type": "number" },
+          "out_start": { "type": "number", "description": "在成片输出时间线的起点（渲染后回填）" },
+          "source_clip_id": { "type": "string" },
+          "label": { "type": "string", "description": "留了什么——内容标签，如 ①承重 / ③HVAC（强制：记录保留内容）" },
+          "join_reason": { "type": "string", "description": "为什么从这里接（splice 衔接说明）" }
+        }
+      }
+    },
+    "cuts": {
+      "type": "array",
+      "description": "被剪掉的区间 + 分类原因（审计用，必填，对应 keep_ranges 之间的空隙）",
+      "items": {
+        "type": "object",
+        "required": ["src_start", "src_end", "category", "reason"],
+        "properties": {
+          "src_start": { "type": "number" },
+          "src_end": { "type": "number" },
+          "category": { "type": "string", "enum": ["off_topic", "bts", "ng_flub", "false_start", "repetition", "retake_overlap", "dead_air", "stutter"], "description": "四类废料 + 重说重叠 + 死区 + 卡壳" },
+          "reason": { "type": "string", "description": "人能看懂的具体原因 + 前后台词上下文" },
+          "transcript_quote": { "type": "string", "description": "被剪段的字幕原文" }
+        }
+      }
+    },
+    "splices": {
+      "type": "array",
+      "description": "重说处理：找重叠点剪前接后（可拼两条 take 优点）。必填 key；本片无重说则写 []（显式声明已考虑）。",
+      "items": { "type": "object",
+        "properties": {
+          "keep_from_take_a": { "type": "string" },
+          "splice_to_take_b_at": { "type": "number" },
+          "note": { "type": "string" }
+        } }
+    },
+    "broll_cover": {
+      "type": "array",
+      "description": "fine-cut 用：每个跳切用哪条空镜盖（只盖画面不换音频）。必填 key；rough 阶段或无需盖则写 []。",
+      "items": { "type": "object",
+        "required": ["out_window_start", "out_window_end", "broll_src_start", "reason"],
+        "properties": {
+          "out_window_start": { "type": "number", "description": "成片输出时间窗口起（跨剪点）" },
+          "out_window_end": { "type": "number" },
+          "broll_src_start": { "type": "number", "description": "空镜取自 source.mp4 的起点" },
+          "broll_label": { "type": "string" },
+          "reason": { "type": "string", "description": "为什么这里盖 + 这条空镜和当下口播什么关系（硬约束 7：空镜要和当下口播相关、不制造事实误导）。与 cuts.reason / keep.label 一致——每个剪辑决策都要有理由。" },
+          "related_transcript_quote": { "type": "string", "description": "盖的窗口对应的口播台词原文（证据：证明空镜与这段话相关，非随意盖）" }
+        } }
+    }
+  }
+}

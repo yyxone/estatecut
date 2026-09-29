@@ -1,0 +1,11 @@
+input:
+  dir: "./input"
+output:
+  dir: "./output"
+music:
+  enabled: true
+  library: "./music"
+  profile: null
+  usage_ledger: "off"
+grading:
+  preset: neutral

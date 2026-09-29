@@ -1,0 +1,14 @@
+input:
+  dir: "./input"
+output:
+  dir: "./output"
+  overwrite: false
+music:
+  enabled: false
+  original_audio: keep
+  usage_ledger: "off"
+grading:
+  preset: neutral
+export:
+  resolution: original
+  quality: medium

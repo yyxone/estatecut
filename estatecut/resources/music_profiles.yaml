@@ -1,0 +1,85 @@
+profiles:
+  modern_apartment:
+    categories:
+    - luxury_elegant
+    - cozy_warm
+    volume: 0.8
+    fade_in: 1.0
+    fade_out: 2.0
+    music_start: 0.0
+    original_audio: remove
+    selection:
+      bpm_range:
+      - 70
+      - 100
+      energy: medium
+  luxury:
+    categories:
+    - luxury_elegant
+    volume: 0.75
+    fade_in: 1.5
+    fade_out: 2.5
+    original_audio: remove
+    selection:
+      bpm_range:
+      - 60
+      - 80
+      energy: low
+  family:
+    categories:
+    - cozy_warm
+    volume: 0.8
+    fade_in: 1.0
+    fade_out: 2.0
+    original_audio: remove
+    selection:
+      bpm_range:
+      - 90
+      - 110
+      energy: medium
+  aerial:
+    categories:
+    - aerial_inspiring
+    - upbeat_happy
+    volume: 0.85
+    fade_in: 0.5
+    fade_out: 2.0
+    original_audio: remove
+    selection:
+      bpm_range:
+      - 110
+      - 130
+      energy: high
+  community:
+    categories:
+    - upbeat_happy
+    - cozy_warm
+    volume: 0.8
+    fade_in: 1.0
+    fade_out: 2.0
+    original_audio: remove
+    selection:
+      bpm_range:
+      - 100
+      - 120
+      energy: medium
+  talking:
+    categories:
+    - cozy_warm
+    volume: 0.25
+    fade_in: 2.0
+    fade_out: 3.0
+    original_audio: mix
+    selection:
+      bpm_range:
+      - 60
+      - 90
+      energy: low
+  default:
+    categories:
+    - cozy_warm
+    - luxury_elegant
+    volume: 0.8
+    fade_in: 1.0
+    fade_out: 2.0
+    original_audio: remove

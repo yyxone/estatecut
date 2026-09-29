@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=77", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "estatecut"
+version = "0.1.0"
+description = "Local, reviewable Chinese speech and property-video workflows using FFmpeg."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE", "THIRD_PARTY_NOTICES.md", "licenses/*.txt"]
+authors = [{name = "Steven Ye"}]
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2,<3", "PyYAML>=6,<7", "numpy>=1.26,<3", "Pillow>=10,<13", "opencv-python-headless>=4.10,<5"]
+
+[project.urls]
+Repository = "https://github.com/yyxone/estatecut"
+Issues = "https://github.com/yyxone/estatecut/issues"
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "jsonschema>=4,<5", "build>=1,<2"]
+asr = ["faster-whisper>=1,<2"]
+
+[project.scripts]
+talkcut = "talkcut.cli:main"
+propcut = "propcut.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["estatecut*", "talkcut*", "propcut*"]
+
+[tool.setuptools.package-data]
+estatecut = ["resources/*.yaml", "resources/*.json", "resources/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -p no:cacheprovider"
